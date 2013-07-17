@@ -503,33 +503,37 @@ int RenderTableSection::layoutRows(int toAdd, int headHeight, int footHeight)
         logicalRowHeights[r] = m_rowPos[r + 1] - m_rowPos[r] - vspacing;
     }
 
-    // Make sure that cell contents do not overlap a page break
-    if (view()->layoutState()->pageLogicalHeight()) {
-        LayoutState* layoutState = view()->layoutState();
-        int pageLogicalHeight = layoutState->m_pageLogicalHeight;
-        int pageOffset = 0;
+   // Make sure that cell contents do not overlap a page break
+   if (view()->layoutState()->pageLogicalHeight()) {
+       LayoutState* layoutState = view()->layoutState();
+       int pageLogicalHeight = layoutState->m_pageLogicalHeight;
+       int pageOffset = 0;
 
-        for (int r = 0; r < totalRows; ++r) {
-            int rowLogicalOffset = m_rowPos[r] + pageOffset;
-            int remainingLogicalHeight = pageLogicalHeight - layoutState->pageLogicalOffset(rowLogicalOffset) % pageLogicalHeight;
+       for (int r = 0; r < totalRows; ++r) {
+           m_rowPos[r] += pageOffset;
+           int remainingLogicalHeight = pageLogicalHeight - layoutState->pageLogicalOffset(m_rowPos[r]) % pageLogicalHeight;
+           int availableHeight = remainingLogicalHeight - footHeight - vspacing;
 
-            for (int c = 0; c < nEffCols; c++) {
-                CellStruct& cs = cellAt(r, c);
-                RenderTableCell* cell = cs.primaryCell();
+           for (int c = 0; c < nEffCols; c++) {
+               CellStruct& cs = cellAt(r, c);
+               RenderTableCell* cell = cs.primaryCell();
 
-                if (!cell || cs.inColSpan || cell->row() != r)
-                    continue;
+               if (!cell || cs.inColSpan || cell->row() != r)
+                   continue;
 
-                int cellRequiredHeight = cell->contentLogicalHeight() + cell->paddingTop(false) + cell->paddingBottom(false);
-                if (max(logicalRowHeights[r], cellRequiredHeight) > remainingLogicalHeight - footHeight - vspacing) {
-                    pageOffset += remainingLogicalHeight + headHeight;
-                    break;
-                }
-            }
-            m_rowPos[r] += pageOffset;
-        }
-        m_rowPos[totalRows] += pageOffset;
-    }
+               int cellRequiredHeight = cell->contentLogicalHeight() + cell->paddingTop(false) + cell->paddingBottom(false);
+               int requiredHeight = max(logicalRowHeights[r], cellRequiredHeight);
+               if (requiredHeight >= availableHeight) {
+                   pageOffset += remainingLogicalHeight + headHeight;
+                   if (requiredHeight > availableHeight) {
+                       m_rowPos[r] += remainingLogicalHeight + headHeight;
+                   }
+                   break;
+               }
+           }
+       }
+       m_rowPos[totalRows] += pageOffset;
+   }
 
     for (int r = 0; r < totalRows; r++) {
         // Set the row's x/y position and width/height.
